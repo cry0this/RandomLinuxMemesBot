@@ -1,0 +1,3 @@
+[submodule "vendor/Meme_Api"]
+	path = vendor/Meme_Api
+	url = https://github.com/cry0this/Meme_Api
