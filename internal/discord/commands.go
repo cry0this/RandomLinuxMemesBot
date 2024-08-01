@@ -50,15 +50,18 @@ var cmdHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interaction
 		log := logrus.WithFields(fields)
 		log.Info("invoked new command")
 
+		errMsg := "Ooops! Couldn't load new linux meme :("
+
 		url, err := memes.GetRandomMemeURL(*ctx, ID)
 		if err != nil {
 			log.WithError(err).Error("failed to get meme url")
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Ooops! Couldn't load new linux meme :(",
+					Content: errMsg,
 				},
 			})
+			return
 		}
 
 		log.Infof("got meme url: %s", url)
@@ -69,9 +72,10 @@ var cmdHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interaction
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Ooops! Couldn't load new linux meme :(",
+					Content: errMsg,
 				},
 			})
+			return
 		}
 
 		defer os.Remove(file.Name())
@@ -89,9 +93,10 @@ var cmdHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interaction
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Ooops! Couldn't load new linux meme :(",
+					Content: errMsg,
 				},
 			})
+			return
 		}
 
 		log.Info("detecting mime type...")
@@ -102,9 +107,10 @@ var cmdHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interaction
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Ooops! Couldn't load new linux meme :(",
+					Content: errMsg,
 				},
 			})
+			return
 		}
 
 		log.Infof("mime type: %s", mime.String())
@@ -115,9 +121,10 @@ var cmdHandlers = map[string]func(s *discordgo.Session, i *discordgo.Interaction
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "Ooops! Couldn't load new linux meme :(",
+					Content: errMsg,
 				},
 			})
+			return
 		}
 
 		log.Info("uploading file to discord")
