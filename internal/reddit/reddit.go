@@ -26,7 +26,7 @@ func Init() error {
 
 	var err error
 
-	client, err = reddit.NewReadonlyClient(reddit.WithUserAgent(userAgent))
+	client, err = reddit.NewClient(reddit.Credentials{}, reddit.FromEnv, reddit.WithUserAgent(userAgent))
 	if err != nil {
 		return err
 	}

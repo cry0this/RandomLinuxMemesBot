@@ -19,6 +19,10 @@ services:
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - REDIS_URL=redis://keydb:6379/0
+      - GO_REDDIT_CLIENT_ID=${GO_REDDIT_CLIENT_ID}
+      - GO_REDDIT_CLIENT_SECRET=${GO_REDDIT_CLIENT_SECRET}
+      - GO_REDDIT_CLIENT_USERNAME=${GO_REDDIT_CLIENT_USERNAME}
+      - GO_REDDIT_CLIENT_PASSWORD=${GO_REDDIT_CLIENT_PASSWORD}
     depends_on:
       keydb:
         condition: service_healthy
