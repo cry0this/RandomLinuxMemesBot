@@ -12,31 +12,11 @@ import (
 )
 
 func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	var fields logrus.Fields
-	var ID string
-
-	if i.User != nil {
-		fields = logrus.Fields{
-			"Command": i.ApplicationCommandData().Name,
-			"User":    i.User.Username,
-			"ID":      i.User.ID,
-		}
-
-		ID = i.User.ID
-	}
-
-	if i.Member != nil {
-		fields = logrus.Fields{
-			"Command":   i.ApplicationCommandData().Name,
-			"GuildID":   i.GuildID,
-			"ChannelID": i.ChannelID,
-			"Member":    i.Member.User.Username,
-		}
-
-		ID = i.GuildID
-	}
-
+	fields := getLogFields(i)
 	log := logrus.WithFields(fields)
+
+	ID := getID(i)
+
 	log.Info("invoked new command")
 
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -71,7 +51,7 @@ func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	log.Info("downloading meme file...")
 
-	err = DownloadFile(file.Name(), meme.URL)
+	err = downloadFile(file.Name(), meme.URL)
 	if err != nil {
 		log.WithError(err).Error("failed to download meme file")
 		followUpErrMessage(s, i, errMsg)

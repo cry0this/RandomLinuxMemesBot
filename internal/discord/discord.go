@@ -83,24 +83,8 @@ func Cleanup() error {
 }
 
 func followUpErrMessage(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) {
-	var fields logrus.Fields
-
-	if i.User != nil {
-		fields = logrus.Fields{
-			"Command": i.ApplicationCommandData().Name,
-			"User":    i.User.Username,
-			"ID":      i.User.ID,
-		}
-	}
-
-	if i.Member != nil {
-		fields = logrus.Fields{
-			"Command":   i.ApplicationCommandData().Name,
-			"GuildID":   i.GuildID,
-			"ChannelID": i.ChannelID,
-			"Member":    i.Member.User.Username,
-		}
-	}
+	fields := getLogFields(i)
+	log := logrus.WithFields(fields)
 
 	s.InteractionResponseDelete(i.Interaction)
 
@@ -108,7 +92,7 @@ func followUpErrMessage(s *discordgo.Session, i *discordgo.InteractionCreate, ms
 		Content: msg,
 		Flags:   discordgo.MessageFlagsEphemeral,
 	}); err != nil {
-		logrus.WithFields(fields).WithError(err).Error("failed to follow up message")
+		log.WithError(err).Error("failed to follow up message")
 	}
 
 }
