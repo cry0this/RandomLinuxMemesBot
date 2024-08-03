@@ -21,6 +21,4 @@ RUN apk add curl
 WORKDIR /app
 COPY --from=build /app/RandomLinuxMemesBot /app/
 
-EXPOSE 8090
-
 CMD ./RandomLinuxMemesBot
