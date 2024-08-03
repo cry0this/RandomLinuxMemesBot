@@ -2,6 +2,8 @@ package discord
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 
 	"github.com/bwmarrin/discordgo"
@@ -14,19 +16,19 @@ var (
 	registeredCommands []*discordgo.ApplicationCommand
 )
 
-func Init(c *context.Context) {
+func Init(c *context.Context) error {
 	ctx = c
 
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
-		logrus.Fatal("unable to get discord token from env")
+		return errors.New("empty discord token, check DISCORD_TOKEN variable")
 	}
 
 	logrus.Info("checking discord token...")
 
 	session, err := discordgo.New("Bot " + token)
 	if err != nil {
-		logrus.WithError(err).Fatal("unable to initialize discord bot")
+		return fmt.Errorf("unable to initialize discord bot: %v", err)
 	}
 
 	logrus.Info("initializing discord bot...")
@@ -48,33 +50,36 @@ func Init(c *context.Context) {
 
 	err = session.Open()
 	if err != nil {
-		logrus.WithError(err).Fatal("cannot open discord session")
+		return fmt.Errorf("cannot open discord session: %v", err)
 	}
 
 	logrus.Info("adding discord commands...")
 	for _, v := range commands {
 		cmd, err := session.ApplicationCommandCreate(session.State.User.ID, "", v)
 		if err != nil {
-			logrus.WithField("command", v.Name).WithError(err).Fatal("cannot create discord command")
+			return fmt.Errorf("cannot register discord '%s' command: %v", v.Name, err)
 		}
 		registeredCommands = append(registeredCommands, cmd)
 	}
 
 	logrus.Info("discord initialized")
+	return nil
 }
 
-func Cleanup() {
+func Cleanup() error {
 	logrus.Info("removing discord commands...")
 
 	for _, v := range registeredCommands {
 		err := session.ApplicationCommandDelete(session.State.User.ID, "", v.ID)
 		if err != nil {
-			logrus.WithField("command", v.Name).WithError(err).Fatal("cannot delete discord command")
+			return fmt.Errorf("cannot delete discord '%s' command: %v", v.Name, err)
 		}
 	}
 
 	logrus.Info("gracefully shutting down")
 	session.Close()
+
+	return nil
 }
 
 func followUpErrMessage(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) {

@@ -30,7 +30,9 @@ func init() {
 		logrus.WithError(err).Fatal("failed to init memes")
 	}
 
-	discord.Init(&ctx)
+	if err := discord.Init(&ctx); err != nil {
+		logrus.WithError(err).Fatal("failed to init discord")
+	}
 
 	logrus.Info("app initialized")
 }
@@ -41,5 +43,8 @@ func main() {
 	<-stop
 
 	logrus.Info("closing app...")
-	discord.Cleanup()
+
+	if err := discord.Cleanup(); err != nil {
+		logrus.WithError(err).Fatal("failed to cleanup discord")
+	}
 }
