@@ -121,13 +121,14 @@ func fillCache(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to get reddit posts: %v", err)
 		}
+
 		if err := redis.PushToHead(ctx, p, ""); err != nil {
 			return fmt.Errorf("failed to fill cache: %v", err)
 		}
-	}
 
-	if err := redis.Expire(ctx, "", ttl); err != nil {
-		return err
+		if err := redis.Expire(ctx, "", ttl); err != nil {
+			return err
+		}
 	}
 
 	return nil
