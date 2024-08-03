@@ -77,12 +77,12 @@ func Cleanup() {
 	session.Close()
 }
 
-func followUpErrMessage(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) error {
+func followUpErrMessage(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) {
 	var fields logrus.Fields
 
 	if i.User != nil {
 		fields = logrus.Fields{
-			"Command": "get-random-linux-meme",
+			"Command": i.ApplicationCommandData().Name,
 			"User":    i.User.Username,
 			"ID":      i.User.ID,
 		}
@@ -90,7 +90,7 @@ func followUpErrMessage(s *discordgo.Session, i *discordgo.InteractionCreate, ms
 
 	if i.Member != nil {
 		fields = logrus.Fields{
-			"Command":   "get-random-linux-meme",
+			"Command":   i.ApplicationCommandData().Name,
 			"GuildID":   i.GuildID,
 			"ChannelID": i.ChannelID,
 			"Member":    i.Member.User.Username,
@@ -99,14 +99,11 @@ func followUpErrMessage(s *discordgo.Session, i *discordgo.InteractionCreate, ms
 
 	s.InteractionResponseDelete(i.Interaction)
 
-	_, err := s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+	if _, err := s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 		Content: msg,
 		Flags:   discordgo.MessageFlagsEphemeral,
-	})
-
-	if err != nil {
+	}); err != nil {
 		logrus.WithFields(fields).WithError(err).Error("failed to follow up message")
 	}
 
-	return err
 }

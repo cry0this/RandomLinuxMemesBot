@@ -4,33 +4,42 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/cry0this/RandomLinuxMemesBot/internal/discord"
 	"github.com/cry0this/RandomLinuxMemesBot/internal/memes"
+	"github.com/cry0this/RandomLinuxMemesBot/internal/reddit"
 	"github.com/cry0this/RandomLinuxMemesBot/internal/redis"
-	"github.com/sirupsen/logrus"
 )
-
-const NSFW = false
 
 var ctx context.Context = context.Background()
 
 func init() {
 	logrus.Info("initializing...")
 
-	redis.Init(ctx, 4*time.Hour)
-	memes.Init(NSFW)
+	if err := redis.Init(ctx); err != nil {
+		logrus.WithError(err).Fatal("failed to init redis")
+	}
+
+	if err := reddit.Init(); err != nil {
+		logrus.WithError(err).Fatal("failed to init reddit")
+	}
+
+	if err := memes.Init(ctx); err != nil {
+		logrus.WithError(err).Fatal("failed to init memes")
+	}
+
 	discord.Init(&ctx)
+
+	logrus.Info("app initialized")
 }
 
 func main() {
-	logrus.Info("application started!")
-
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 	<-stop
 
-	logrus.Info("cleaning up...")
+	logrus.Info("closing app...")
 	discord.Cleanup()
 }

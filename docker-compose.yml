@@ -13,34 +13,14 @@ services:
       start_period: 5s
     command: keydb-server /etc/keydb/keydb.conf --appendonly yes
 
-  api:
-    image: cry0this/meme-api:latest # https://github.com/cry0this/Meme_Api
-    restart: unless-stopped
-    environment:
-      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID}
-      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET}
-      - REDISCLOUD_URL=redis://keydb:6379/0
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/_health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-    depends_on:
-      keydb:
-        condition: service_healthy
-
   bot:
     image: cry0this/random-linux-memes-bot:latest
     restart: unless-stopped
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - REDIS_URL=redis://keydb:6379/1
-      - MEME_API_URL=http://api:8080
+      - REDIS_URL=redis://keydb:6379/0
     depends_on:
       keydb:
-        condition: service_healthy
-      api:
         condition: service_healthy
 
 volumes:

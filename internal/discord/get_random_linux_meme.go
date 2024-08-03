@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/cry0this/RandomLinuxMemesBot/internal/memes"
-	"github.com/cry0this/RandomLinuxMemesBot/internal/utils"
 )
 
 func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -18,7 +17,7 @@ func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	if i.User != nil {
 		fields = logrus.Fields{
-			"Command": "get-random-linux-meme",
+			"Command": i.ApplicationCommandData().Name,
 			"User":    i.User.Username,
 			"ID":      i.User.ID,
 		}
@@ -28,7 +27,7 @@ func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	if i.Member != nil {
 		fields = logrus.Fields{
-			"Command":   "get-random-linux-meme",
+			"Command":   i.ApplicationCommandData().Name,
 			"GuildID":   i.GuildID,
 			"ChannelID": i.ChannelID,
 			"Member":    i.Member.User.Username,
@@ -47,7 +46,7 @@ func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	errMsg := "Ooops! Couldn't find new linux meme :("
 
-	meme, err := memes.GetRandomMeme(*ctx, ID)
+	meme, err := memes.GetNewMeme(*ctx, ID)
 	if err != nil {
 		log.WithError(err).Error("failed to get meme url")
 		followUpErrMessage(s, i, errMsg)
@@ -55,8 +54,6 @@ func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	log.Infof("got meme: %v", meme)
-
-	url := meme.Preview[len(meme.Preview)-1]
 
 	file, err := os.CreateTemp("/tmp", "linuxmemes.*.jpg")
 	if err != nil {
@@ -68,13 +65,13 @@ func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	defer os.Remove(file.Name())
 
 	log = log.WithFields(logrus.Fields{
-		"url":  url,
+		"url":  meme.URL,
 		"file": file.Name(),
 	})
 
 	log.Info("downloading meme file...")
 
-	err = utils.DownloadFile(file.Name(), url)
+	err = DownloadFile(file.Name(), meme.URL)
 	if err != nil {
 		log.WithError(err).Error("failed to download meme file")
 		followUpErrMessage(s, i, errMsg)
