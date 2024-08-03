@@ -7,12 +7,17 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/sethvargo/go-retry"
+	"github.com/sirupsen/logrus"
+
 	"github.com/cry0this/RandomLinuxMemesBot/internal/reddit"
 	"github.com/cry0this/RandomLinuxMemesBot/internal/redis"
-	"github.com/sirupsen/logrus"
 )
 
-const ttl = 6 * time.Hour
+const (
+	ttl      = 6 * time.Hour
+	maxTries = 100
+)
 
 func Init(ctx context.Context) error {
 	return fillCache(ctx)
@@ -79,35 +84,70 @@ func GetNewMeme(ctx context.Context, guildId string) (*reddit.Post, error) {
 
 		p := postsBefore[0]
 
+		log.WithFields(logrus.Fields{
+			"ID":    p.ID,
+			"Title": p.Title,
+			"URL":   p.URL,
+		}).Info("adding post to guild cache")
+
 		if err := redis.AddToCache(ctx, p, guildId); err != nil {
 			return nil, err
 		}
 		return p, nil
 	}
 
+	postsAfter := make([]*reddit.Post, 0)
+	var newPost *reddit.Post
+
 	// try to find older posts
-	after := cachedAll[len(cachedAll)-1].ID
-	postsAfter, err := reddit.GetPostsAfter(ctx, after)
-	if err != nil {
+	b := retry.NewConstant(time.Millisecond)
+	b = retry.WithMaxRetries(maxTries, b)
+	if retry.Do(ctx, b, func(_ context.Context) error {
+		log.Info("trying to find older post for guild...")
+
+		after := cachedAll[len(cachedAll)-1].ID
+		postsAfter, err = reddit.GetPostsAfter(ctx, after)
+		if err != nil {
+			return err
+		}
+
+		if len(postsAfter) == 0 {
+			return errors.New("unable to find older posts")
+		}
+
+		log.Info("adding older posts to cache")
+		if err := redis.PushToTail(ctx, postsAfter, ""); err != nil {
+			return err
+		}
+
+		cachedAll, err = redis.GetCachedPosts(ctx, "")
+		if err != nil {
+			return err
+		}
+
+		for _, p := range postsAfter {
+			if !postInSlice(p, cachedGuild) {
+				newPost = p
+				return nil
+			}
+		}
+
+		return retry.RetryableError(errors.New("unable to find older post for guild"))
+	}); err != nil {
 		return nil, err
 	}
 
-	if len(postsAfter) == 0 {
-		return nil, errors.New("unable to find new posts")
-	}
+	log.WithFields(logrus.Fields{
+		"ID":    newPost.ID,
+		"Title": newPost.Title,
+		"URL":   newPost.URL,
+	}).Info("adding post to guild cache")
 
-	log.Info("adding older posts to cache")
-
-	if err := redis.PushToTail(ctx, postsAfter, ""); err != nil {
+	if err := redis.AddToCache(ctx, newPost, guildId); err != nil {
 		return nil, err
 	}
 
-	p := postsAfter[0]
-	if err := redis.AddToCache(ctx, p, guildId); err != nil {
-		return nil, err
-	}
-
-	return p, nil
+	return newPost, nil
 }
 
 func fillCache(ctx context.Context) error {

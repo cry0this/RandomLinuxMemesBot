@@ -6,6 +6,7 @@ require (
 	github.com/bwmarrin/discordgo v0.28.1
 	github.com/gabriel-vasile/mimetype v1.4.5
 	github.com/redis/go-redis/v9 v9.6.1
+	github.com/sethvargo/go-retry v0.3.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/vartanbeno/go-reddit/v2 v2.0.1
 )
