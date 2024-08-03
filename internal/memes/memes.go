@@ -4,15 +4,20 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	gohttpclient "github.com/bozd4g/go-http-client"
-	"github.com/sirupsen/logrus"
-
 	"github.com/cry0this/RandomLinuxMemesBot/internal/redis"
+	retry "github.com/sethvargo/go-retry"
+	"github.com/sirupsen/logrus"
 )
 
-var memeURL string
-var nsfwEnabled bool
+const maxRetries = 5
+
+var (
+	memeURL     string
+	nsfwEnabled bool
+)
 
 type Meme struct {
 	PostLink  string   `json:"postLink"`
@@ -26,9 +31,9 @@ type Meme struct {
 	Preview   []string `json:"preview"`
 }
 
-type MemeResponse struct {
-	Count int    `json:"count"`
-	Memes []Meme `json:"memes"`
+type MemeApiResponse struct {
+	Count int
+	Memes []Meme
 }
 
 func Init(nsfw bool) {
@@ -43,51 +48,58 @@ func Init(nsfw bool) {
 }
 
 func GetRandomMeme(ctx context.Context, guildID string) (*Meme, error) {
-	client := gohttpclient.New(memeURL)
-
-	response, err := client.Get(ctx, "/gimme/linuxmemes/50")
-	if err != nil {
-		return nil, err
-	}
-
-	var data MemeResponse
-	if err := response.Unmarshal(&data); err != nil {
-		return nil, err
-	}
+	b := retry.NewConstant(time.Millisecond)
+	b = retry.WithMaxRetries(maxRetries, b)
 
 	var meme *Meme
 
-	for _, m := range data.Memes {
-		log := logrus.WithFields(logrus.Fields{
-			"url":     m.URL,
-			"guildID": guildID,
-		})
-
-		if m.NSFW && !nsfwEnabled {
-			log.Info("meme url skipped because NSFW")
-			continue
-		}
-
-		exist, err := redis.IsCached(ctx, guildID, m.URL)
+	if err := retry.Do(ctx, b, func(_ context.Context) error {
+		client := gohttpclient.New(memeURL)
+		response, err := client.Get(ctx, "/gimme/linuxmemes/50")
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		if exist {
-			log.Info("url was in cache, skipping")
-			continue
+		var api MemeApiResponse
+		if err = response.Unmarshal(&api); err != nil {
+			return err
 		}
 
-		meme = &m
-		break
-	}
+		for _, m := range api.Memes {
+			log := logrus.WithFields(logrus.Fields{
+				"guildID": guildID,
+				"url":     m.URL,
+			})
 
-	if meme == nil {
-		return nil, fmt.Errorf("unable to find new meme :(")
-	}
+			if m.NSFW && !nsfwEnabled {
+				log.Warning("meme skipped because NSFW")
+				continue
+			}
 
-	err = redis.AddToCache(ctx, guildID, meme.URL)
-	if err != nil {
+			exist, err := redis.IsCached(ctx, guildID, m.URL)
+			if err != nil {
+				return err
+			}
+
+			if exist {
+				log.Warning("meme already shown")
+				continue
+			}
+
+			meme = &m
+		}
+
+		if meme == nil {
+			if _, err := client.Get(ctx, "/clear"); err != nil {
+				return err
+			}
+
+			return retry.RetryableError(fmt.Errorf("couldn't find new meme for guild"))
+		}
+
+		redis.AddToCache(ctx, guildID, meme.URL)
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 

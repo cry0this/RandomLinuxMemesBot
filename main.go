@@ -19,7 +19,7 @@ var ctx context.Context = context.Background()
 func init() {
 	logrus.Info("initializing...")
 
-	redis.Init(ctx, 2*time.Hour)
+	redis.Init(ctx, 4*time.Hour)
 	memes.Init(NSFW)
 	discord.Init(&ctx)
 }

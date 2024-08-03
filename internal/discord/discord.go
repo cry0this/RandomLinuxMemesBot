@@ -76,3 +76,37 @@ func Cleanup() {
 	logrus.Info("gracefully shutting down")
 	session.Close()
 }
+
+func followUpErrMessage(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) error {
+	var fields logrus.Fields
+
+	if i.User != nil {
+		fields = logrus.Fields{
+			"Command": "get-random-linux-meme",
+			"User":    i.User.Username,
+			"ID":      i.User.ID,
+		}
+	}
+
+	if i.Member != nil {
+		fields = logrus.Fields{
+			"Command":   "get-random-linux-meme",
+			"GuildID":   i.GuildID,
+			"ChannelID": i.ChannelID,
+			"Member":    i.Member.User.Username,
+		}
+	}
+
+	s.InteractionResponseDelete(i.Interaction)
+
+	_, err := s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+		Content: msg,
+		Flags:   discordgo.MessageFlagsEphemeral,
+	})
+
+	if err != nil {
+		logrus.WithFields(fields).WithError(err).Error("failed to follow up message")
+	}
+
+	return err
+}

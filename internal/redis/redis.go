@@ -59,6 +59,11 @@ func AddToCache(ctx context.Context, guildID string, url string) error {
 		return err
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"guildID": guildID,
+		"url":     url,
+	}).Info("added url to cache")
+
 	return nil
 }
 
