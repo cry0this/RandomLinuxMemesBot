@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -28,6 +29,14 @@ func DownloadFile(fileName string, url string) error {
 	}
 	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
-	return err
+	written, err := io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if written == 0 {
+		return fmt.Errorf("empty file")
+	}
+
+	return nil
 }

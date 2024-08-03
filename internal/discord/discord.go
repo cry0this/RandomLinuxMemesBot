@@ -9,11 +9,14 @@ import (
 )
 
 var (
-	ctx     *context.Context
-	session *discordgo.Session
+	ctx                *context.Context
+	session            *discordgo.Session
+	registeredCommands []*discordgo.ApplicationCommand
 )
 
 func Init(c *context.Context) {
+	ctx = c
+
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
 		logrus.Fatal("unable to get discord token from env")
@@ -21,13 +24,10 @@ func Init(c *context.Context) {
 
 	logrus.Info("checking discord token...")
 
-	var err error
-	session, err = discordgo.New("Bot " + token)
+	session, err := discordgo.New("Bot " + token)
 	if err != nil {
 		logrus.WithError(err).Fatal("unable to initialize discord bot")
 	}
-
-	ctx = c
 
 	logrus.Info("initializing discord bot...")
 
@@ -52,12 +52,12 @@ func Init(c *context.Context) {
 	}
 
 	logrus.Info("adding discord commands...")
-	for i, v := range commands {
+	for _, v := range commands {
 		cmd, err := session.ApplicationCommandCreate(session.State.User.ID, "", v)
 		if err != nil {
 			logrus.WithField("command", v.Name).WithError(err).Fatal("cannot create discord command")
 		}
-		registeredCommands[i] = cmd
+		registeredCommands = append(registeredCommands, cmd)
 	}
 
 	logrus.Info("discord initialized")

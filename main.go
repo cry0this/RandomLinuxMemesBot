@@ -12,13 +12,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const NSFW = false
+
 var ctx context.Context = context.Background()
 
 func init() {
 	logrus.Info("initializing...")
 
 	redis.Init(ctx, 2*time.Hour)
-	memes.Init(false)
+	memes.Init(NSFW)
 	discord.Init(&ctx)
 }
 

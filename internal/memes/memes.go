@@ -42,20 +42,20 @@ func Init(nsfw bool) {
 	nsfwEnabled = nsfw
 }
 
-func GetRandomMemeURL(ctx context.Context, guildID string) (string, error) {
+func GetRandomMeme(ctx context.Context, guildID string) (*Meme, error) {
 	client := gohttpclient.New(memeURL)
 
 	response, err := client.Get(ctx, "/gimme/linuxmemes/50")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var data MemeResponse
 	if err := response.Unmarshal(&data); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var url string
+	var meme *Meme
 
 	for _, m := range data.Memes {
 		log := logrus.WithFields(logrus.Fields{
@@ -68,9 +68,9 @@ func GetRandomMemeURL(ctx context.Context, guildID string) (string, error) {
 			continue
 		}
 
-		exist, err := redis.ExistsInCache(ctx, guildID, m.URL)
+		exist, err := redis.IsCached(ctx, guildID, m.URL)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		if exist {
@@ -78,18 +78,18 @@ func GetRandomMemeURL(ctx context.Context, guildID string) (string, error) {
 			continue
 		}
 
-		url = m.URL
+		meme = &m
 		break
 	}
 
-	if url == "" {
-		return "", fmt.Errorf("unable to find new meme :(")
+	if meme == nil {
+		return nil, fmt.Errorf("unable to find new meme :(")
 	}
 
-	err = redis.AddToCache(ctx, guildID, url)
+	err = redis.AddToCache(ctx, guildID, meme.URL)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return url, nil
+	return meme, nil
 }

@@ -62,7 +62,7 @@ func AddToCache(ctx context.Context, guildID string, url string) error {
 	return nil
 }
 
-func ExistsInCache(ctx context.Context, guildID string, url string) (bool, error) {
+func IsCached(ctx context.Context, guildID string, url string) (bool, error) {
 	r, err := Client.LRange(ctx, guildID, 0, -1).Result()
 	if err == redis.Nil {
 		return false, nil
