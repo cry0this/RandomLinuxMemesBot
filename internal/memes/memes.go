@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	ttl      = 6 * time.Hour
 	maxTries = 100
 )
 
@@ -164,10 +163,6 @@ func fillCache(ctx context.Context) error {
 
 		if err := redis.PushToHead(ctx, p, ""); err != nil {
 			return fmt.Errorf("failed to fill cache: %v", err)
-		}
-
-		if err := redis.Expire(ctx, "", ttl); err != nil {
-			return err
 		}
 	}
 

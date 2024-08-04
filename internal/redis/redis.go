@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -89,9 +88,4 @@ func GetCachedPosts(ctx context.Context, key string) ([]*reddit.Post, error) {
 	}
 
 	return posts, nil
-}
-
-func Expire(ctx context.Context, key string, ttl time.Duration) error {
-	k := normalizeKey(key)
-	return client.Expire(ctx, k, ttl).Err()
 }
