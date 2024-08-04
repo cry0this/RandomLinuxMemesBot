@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	maxTries = 100
+	maxTries = 5
 )
 
 func Init(ctx context.Context) error {
