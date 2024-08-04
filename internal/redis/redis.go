@@ -10,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
+	"github.com/cry0this/RandomLinuxMemesBot/internal/appctx"
 	"github.com/cry0this/RandomLinuxMemesBot/internal/reddit"
 )
 
@@ -37,43 +38,64 @@ func Init(ctx context.Context) error {
 	return nil
 }
 
-func AddToCache(ctx context.Context, post *reddit.Post, key string) error {
+func AddToCache(ctx *appctx.Context, post *reddit.Post, key string) error {
+	ctx.Logger.WithFields(logrus.Fields{
+		"func": "redis.AddToCache",
+		"post": post,
+		"key":  key,
+	}).Info("adding to cache...")
+
 	posts := []*reddit.Post{post}
 	return PushToTail(ctx, posts, key)
 }
 
-func PushToHead(ctx context.Context, posts []*reddit.Post, key string) error {
-	p, err := preparePosts(posts)
+func PushToHead(ctx *appctx.Context, posts []*reddit.Post, key string) error {
+	p, err := preparePosts(ctx, posts)
 	if err != nil {
 		return err
 	}
 
 	k := normalizeKey(key)
-	if err := client.LPush(ctx, k, p).Err(); err != nil {
+	if err := client.LPush(ctx.Context, k, p).Err(); err != nil {
 		return err
 	}
+
+	ctx.Logger.WithFields(logrus.Fields{
+		"func": "redis.PushToHead",
+		"key":  key,
+	}).Infof("pushed: %d", len(posts))
 
 	return nil
 }
 
-func PushToTail(ctx context.Context, posts []*reddit.Post, key string) error {
-	p, err := preparePosts(posts)
+func PushToTail(ctx *appctx.Context, posts []*reddit.Post, key string) error {
+	p, err := preparePosts(ctx, posts)
 	if err != nil {
 		return err
 	}
 
 	k := normalizeKey(key)
-	if err := client.RPush(ctx, k, p).Err(); err != nil {
+	if err := client.RPush(ctx.Context, k, p).Err(); err != nil {
 		return err
 	}
+
+	ctx.Logger.WithFields(logrus.Fields{
+		"func": "redis.PushToTail",
+		"key":  key,
+	}).Infof("pushed: %d", len(posts))
 
 	return nil
 }
 
-func GetCachedPosts(ctx context.Context, key string) ([]*reddit.Post, error) {
+func GetCachedPosts(ctx *appctx.Context, key string) ([]*reddit.Post, error) {
+	ctx.Logger.WithFields(logrus.Fields{
+		"func": "redis.GetCachedPosts",
+		"key":  key,
+	}).Info("getting cached posts...")
+
 	k := normalizeKey(key)
 
-	strings, err := client.LRange(ctx, k, 0, -1).Result()
+	strings, err := client.LRange(ctx.Context, k, 0, -1).Result()
 	if err != nil {
 		return nil, err
 	}

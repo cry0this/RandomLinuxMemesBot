@@ -10,6 +10,7 @@ import (
 	"github.com/sethvargo/go-retry"
 	"github.com/sirupsen/logrus"
 
+	"github.com/cry0this/RandomLinuxMemesBot/internal/appctx"
 	"github.com/cry0this/RandomLinuxMemesBot/internal/reddit"
 	"github.com/cry0this/RandomLinuxMemesBot/internal/redis"
 )
@@ -18,13 +19,12 @@ const (
 	maxTries = 5
 )
 
-func Init(ctx context.Context) error {
-	return fillCache(ctx)
-}
-
-func GetNewMeme(ctx context.Context, guildId string) (*reddit.Post, error) {
-	log := logrus.WithField("guild", guildId)
-	log.Info("got new meme request")
+func GetNewMeme(ctx *appctx.Context, guildId string) (*reddit.Post, error) {
+	log := ctx.Logger.WithFields(logrus.Fields{
+		"func":  "memes.GetNewMeme",
+		"guild": guildId,
+	})
+	log.Info("got new request")
 
 	cachedAll, err := redis.GetCachedPosts(ctx, "")
 	if err != nil {
@@ -54,9 +54,9 @@ func GetNewMeme(ctx context.Context, guildId string) (*reddit.Post, error) {
 	for _, p := range randomized {
 		if !postInSlice(p, cachedGuild) {
 			log.WithFields(logrus.Fields{
-				"ID":    p.ID,
-				"Title": p.Title,
-				"URL":   p.URL,
+				"id":    p.ID,
+				"title": p.Title,
+				"url":   p.URL,
 			}).Info("adding post to guild cache")
 
 			if err := redis.AddToCache(ctx, p, guildId); err != nil {
@@ -66,6 +66,8 @@ func GetNewMeme(ctx context.Context, guildId string) (*reddit.Post, error) {
 			return p, nil
 		}
 	}
+
+	log.Info("trying to find new posts...")
 
 	// try to find newer posts
 	before := cachedAll[0].ID
@@ -84,9 +86,9 @@ func GetNewMeme(ctx context.Context, guildId string) (*reddit.Post, error) {
 		p := postsBefore[0]
 
 		log.WithFields(logrus.Fields{
-			"ID":    p.ID,
-			"Title": p.Title,
-			"URL":   p.URL,
+			"id":    p.ID,
+			"title": p.Title,
+			"url":   p.URL,
 		}).Info("adding post to guild cache")
 
 		if err := redis.AddToCache(ctx, p, guildId); err != nil {
@@ -101,7 +103,7 @@ func GetNewMeme(ctx context.Context, guildId string) (*reddit.Post, error) {
 	// try to find older posts
 	b := retry.NewConstant(time.Millisecond)
 	b = retry.WithMaxRetries(maxTries, b)
-	if retry.Do(ctx, b, func(_ context.Context) error {
+	if retry.Do(ctx.Context, b, func(_ context.Context) error {
 		log.Info("trying to find older post for guild...")
 
 		after := cachedAll[len(cachedAll)-1].ID
@@ -137,9 +139,9 @@ func GetNewMeme(ctx context.Context, guildId string) (*reddit.Post, error) {
 	}
 
 	log.WithFields(logrus.Fields{
-		"ID":    newPost.ID,
-		"Title": newPost.Title,
-		"URL":   newPost.URL,
+		"id":    newPost.ID,
+		"title": newPost.Title,
+		"url":   newPost.URL,
 	}).Info("adding post to guild cache")
 
 	if err := redis.AddToCache(ctx, newPost, guildId); err != nil {
@@ -149,7 +151,9 @@ func GetNewMeme(ctx context.Context, guildId string) (*reddit.Post, error) {
 	return newPost, nil
 }
 
-func fillCache(ctx context.Context) error {
+func fillCache(ctx *appctx.Context) error {
+	ctx.Logger.WithField("func", "memes.fillCache").Info("refilling cache...")
+
 	p, err := redis.GetCachedPosts(ctx, "")
 	if err != nil {
 		return fmt.Errorf("failed to read cache: %v", err)

@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/cry0this/RandomLinuxMemesBot/internal/discord"
-	"github.com/cry0this/RandomLinuxMemesBot/internal/memes"
 	"github.com/cry0this/RandomLinuxMemesBot/internal/reddit"
 	"github.com/cry0this/RandomLinuxMemesBot/internal/redis"
 )
@@ -24,10 +23,6 @@ func init() {
 
 	if err := reddit.Init(); err != nil {
 		logrus.WithError(err).Fatal("failed to init reddit")
-	}
-
-	if err := memes.Init(ctx); err != nil {
-		logrus.WithError(err).Fatal("failed to init memes")
 	}
 
 	if err := discord.Init(&ctx); err != nil {

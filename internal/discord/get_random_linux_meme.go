@@ -1,35 +1,41 @@
 package discord
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
+	"github.com/cry0this/RandomLinuxMemesBot/internal/appctx"
 	"github.com/cry0this/RandomLinuxMemesBot/internal/memes"
 )
 
 func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	u := uuid.New()
+	c := context.WithValue(*ctx, appctx.Identifier, u.String())
+	actx := appctx.NewContext(c)
+
 	fields := getLogFields(i)
-	log := logrus.WithFields(fields)
+	actx.Logger.WithFields(fields).Info("invoked new command")
+	log := actx.Logger
 
 	ID := getID(i)
-
-	log.Info("invoked new command")
 
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{},
 	})
 
-	errMsg := "Ooops! Couldn't find new linux meme :("
+	errMsg := "Ooops! Couldn't find new linux meme :(\nTry again later..."
 
-	meme, err := memes.GetNewMeme(*ctx, ID)
+	meme, err := memes.GetNewMeme(actx, ID)
 	if err != nil {
 		log.WithError(err).Error("failed to get meme url")
-		followUpErrMessage(s, i, errMsg)
+		followUpErrMessage(actx, s, i, errMsg)
 		return
 	}
 
@@ -38,23 +44,21 @@ func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	file, err := os.CreateTemp("/tmp", "linuxmemes.*.jpg")
 	if err != nil {
 		log.WithError(err).Error("failed to create tmp file")
-		followUpErrMessage(s, i, errMsg)
+		followUpErrMessage(actx, s, i, errMsg)
 		return
 	}
 
 	defer os.Remove(file.Name())
 
-	log = log.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"url":  meme.URL,
 		"file": file.Name(),
-	})
-
-	log.Info("downloading meme file...")
+	}).Info("downloading meme file...")
 
 	err = downloadFile(file.Name(), meme.URL)
 	if err != nil {
 		log.WithError(err).Error("failed to download meme file")
-		followUpErrMessage(s, i, errMsg)
+		followUpErrMessage(actx, s, i, errMsg)
 		return
 	}
 
@@ -63,7 +67,7 @@ func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	mime, err := mimetype.DetectFile(file.Name())
 	if err != nil {
 		log.WithError(err).Error("failed to detect mime type")
-		followUpErrMessage(s, i, errMsg)
+		followUpErrMessage(actx, s, i, errMsg)
 		return
 	}
 
@@ -72,7 +76,7 @@ func getRandomLinuxMeme(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	reader, err := os.Open(file.Name())
 	if err != nil {
 		log.WithError(err).Error("failed to open file")
-		followUpErrMessage(s, i, errMsg)
+		followUpErrMessage(actx, s, i, errMsg)
 		return
 	}
 

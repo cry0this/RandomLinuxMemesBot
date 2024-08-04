@@ -40,18 +40,18 @@ func getLogFields(i *discordgo.InteractionCreate) logrus.Fields {
 
 	if i.User != nil {
 		fields = logrus.Fields{
-			"Command": i.ApplicationCommandData().Name,
-			"User":    i.User.Username,
-			"ID":      i.User.ID,
+			"command": i.ApplicationCommandData().Name,
+			"user":    i.User.Username,
+			"id":      i.User.ID,
 		}
 	}
 
 	if i.Member != nil {
 		fields = logrus.Fields{
-			"Command":   i.ApplicationCommandData().Name,
-			"GuildID":   i.GuildID,
-			"ChannelID": i.ChannelID,
-			"Member":    i.Member.User.Username,
+			"command": i.ApplicationCommandData().Name,
+			"guild":   i.GuildID,
+			"channel": i.ChannelID,
+			"member":  i.Member.User.Username,
 		}
 	}
 

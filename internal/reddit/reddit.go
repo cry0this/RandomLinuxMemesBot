@@ -1,10 +1,10 @@
 package reddit
 
 import (
-	"context"
-
 	"github.com/sirupsen/logrus"
 	"github.com/vartanbeno/go-reddit/v2/reddit"
+
+	"github.com/cry0this/RandomLinuxMemesBot/internal/appctx"
 )
 
 type Post struct {
@@ -35,14 +35,21 @@ func Init() error {
 	return nil
 }
 
-func GetPosts(ctx context.Context) ([]*Post, error) {
+func GetPosts(ctx *appctx.Context) ([]*Post, error) {
+	ctx.Logger.WithField("func", "reddit.GetHotPosts").Info("got new request")
+
 	opts := reddit.ListOptions{
 		Limit: limitPosts,
 	}
 	return getPosts(ctx, opts)
 }
 
-func GetPostsBefore(ctx context.Context, before string) ([]*Post, error) {
+func GetPostsBefore(ctx *appctx.Context, before string) ([]*Post, error) {
+	ctx.Logger.WithFields(logrus.Fields{
+		"func":   "reddit.GetHotPostsBefore",
+		"before": before,
+	}).Info("got new request")
+
 	opts := reddit.ListOptions{
 		Limit:  limitPosts,
 		Before: before,
@@ -50,7 +57,12 @@ func GetPostsBefore(ctx context.Context, before string) ([]*Post, error) {
 	return getPosts(ctx, opts)
 }
 
-func GetPostsAfter(ctx context.Context, after string) ([]*Post, error) {
+func GetPostsAfter(ctx *appctx.Context, after string) ([]*Post, error) {
+	ctx.Logger.WithFields(logrus.Fields{
+		"func":  "reddit.GetHotPostsAfter",
+		"after": after,
+	}).Info("got new request")
+
 	opts := reddit.ListOptions{
 		Limit: limitPosts,
 		After: after,
@@ -58,13 +70,14 @@ func GetPostsAfter(ctx context.Context, after string) ([]*Post, error) {
 	return getPosts(ctx, opts)
 }
 
-func getPosts(ctx context.Context, opts reddit.ListOptions) ([]*Post, error) {
-	posts, _, err := client.Subreddit.HotPosts(ctx, subreddit, &opts)
+func getPosts(ctx *appctx.Context, opts reddit.ListOptions) ([]*Post, error) {
+	posts, _, err := client.Subreddit.HotPosts(ctx.Context, subreddit, &opts)
 	if err != nil {
 		return nil, err
 	}
 
-	posts = FilterPosts(posts)
+	ctx.Logger.WithField("func", "reddit.getHotPosts").Infof("got posts: %d", len(posts))
+	posts = filterPosts(ctx, posts)
 
 	result := make([]*Post, 0)
 	for _, p := range posts {

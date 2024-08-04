@@ -8,6 +8,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/sirupsen/logrus"
+
+	"github.com/cry0this/RandomLinuxMemesBot/internal/appctx"
 )
 
 var (
@@ -18,6 +20,8 @@ var (
 
 func Init(c *context.Context) error {
 	ctx = c
+
+	logrus.Info("initializing discord...")
 
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
@@ -31,7 +35,7 @@ func Init(c *context.Context) error {
 		return fmt.Errorf("unable to initialize discord bot: %v", err)
 	}
 
-	logrus.Info("initializing discord bot...")
+	logrus.Info("setting up discord bot...")
 
 	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if h, ok := cmdHandlers[i.ApplicationCommandData().Name]; ok {
@@ -76,23 +80,22 @@ func Cleanup() error {
 		}
 	}
 
-	logrus.Info("gracefully shutting down")
-	session.Close()
+	logrus.Info("shutting down discord...")
+	if err := session.Close(); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func followUpErrMessage(s *discordgo.Session, i *discordgo.InteractionCreate, msg string) {
-	fields := getLogFields(i)
-	log := logrus.WithFields(fields)
-
+func followUpErrMessage(ctx *appctx.Context, s *discordgo.Session, i *discordgo.InteractionCreate, msg string) {
 	s.InteractionResponseDelete(i.Interaction)
 
 	if _, err := s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 		Content: msg,
 		Flags:   discordgo.MessageFlagsEphemeral,
 	}); err != nil {
-		log.WithError(err).Error("failed to follow up message")
+		ctx.Logger.WithError(err).Error("failed to follow up message")
 	}
 
 }

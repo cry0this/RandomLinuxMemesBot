@@ -6,7 +6,8 @@ import (
 	"slices"
 
 	"github.com/cry0this/RandomLinuxMemesBot/internal/reddit"
-	"github.com/sirupsen/logrus"
+
+	"github.com/cry0this/RandomLinuxMemesBot/internal/appctx"
 )
 
 const (
@@ -14,12 +15,12 @@ const (
 	guildPrefix  = "guild"
 )
 
-func preparePosts(posts []*reddit.Post) ([]string, error) {
+func preparePosts(ctx *appctx.Context, posts []*reddit.Post) ([]string, error) {
 	strings := make([]string, 0)
 	for _, p := range posts {
 		b, err := json.Marshal(p)
 		if err != nil {
-			logrus.WithError(err).Errorf("failed to marshal post: %v", p)
+			ctx.Logger.WithField("func", "redis.preparePosts").WithError(err).Errorf("failed to marshal post: %v", p)
 			return nil, err
 		}
 		strings = append(strings, string(b))
