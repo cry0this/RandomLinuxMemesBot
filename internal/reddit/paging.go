@@ -125,10 +125,10 @@ func NewHotPage(actx *appctx.Context) *Page {
 	}
 }
 
-func NewTopPage(actx *appctx.Context, t string) *Page {
+func NewTopPage(actx *appctx.Context, period string) *Page {
 	actx.Logger.WithField("func", "reddit.NewTopPage").Info("creating new page")
 	opts := reddit.ListPostOptions{
-		Time: t,
+		Time: period,
 		ListOptions: reddit.ListOptions{
 			Limit: maxLimit,
 		},

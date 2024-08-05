@@ -25,7 +25,7 @@ func filterNonImagePosts(actx *appctx.Context, posts []*Post) []*Post {
 	filtered := make([]*Post, 0)
 
 	for _, p := range posts {
-		for _, s := range []string{".jpg", ".png", ".gif"} {
+		for _, s := range []string{".jpg", ".jpeg", ".png", ".gif"} {
 			if strings.HasSuffix(p.URL, s) {
 				filtered = append(filtered, p)
 			}
