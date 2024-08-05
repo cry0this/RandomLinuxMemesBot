@@ -8,8 +8,6 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/sirupsen/logrus"
-
-	"github.com/cry0this/RandomLinuxMemesBot/internal/appctx"
 )
 
 var (
@@ -18,24 +16,26 @@ var (
 	registeredCommands []*discordgo.ApplicationCommand
 )
 
-func Init(c *context.Context) error {
-	ctx = c
+func Init(c context.Context) error {
+	ctx = &c
 
-	logrus.Info("initializing discord...")
+	log := logrus.WithField("module", "discord")
+	log.Info("initializing...")
 
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
 		return errors.New("empty discord token, check DISCORD_TOKEN variable")
 	}
 
-	logrus.Info("checking discord token...")
+	log.Info("checking token...")
 
-	session, err := discordgo.New("Bot " + token)
+	var err error
+	session, err = discordgo.New("Bot " + token)
 	if err != nil {
 		return fmt.Errorf("unable to initialize discord bot: %v", err)
 	}
 
-	logrus.Info("setting up discord bot...")
+	log.Info("setting up...")
 
 	session.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if h, ok := cmdHandlers[i.ApplicationCommandData().Name]; ok {
@@ -44,35 +44,37 @@ func Init(c *context.Context) error {
 	})
 
 	session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"username":      s.State.User.Username,
 			"discriminator": s.State.User.Discriminator,
-		}).Info("Logged in")
+		}).Info("logged in")
 	})
 
-	logrus.Info("opening discord session...")
+	log.Info("opening session...")
 
 	err = session.Open()
 	if err != nil {
 		return fmt.Errorf("cannot open discord session: %v", err)
 	}
 
-	logrus.Info("adding discord commands...")
+	log.Info("adding commands...")
 	for _, v := range commands {
 		cmd, err := session.ApplicationCommandCreate(session.State.User.ID, "", v)
 		if err != nil {
-			return fmt.Errorf("cannot register discord '%s' command: %v", v.Name, err)
+			return fmt.Errorf("cannot add discord '%s' command: %v", v.Name, err)
 		}
 		registeredCommands = append(registeredCommands, cmd)
 	}
 
-	logrus.Info("discord initialized")
+	log.Info("initialized")
 	return nil
 }
 
 func Cleanup() error {
-	logrus.Info("removing discord commands...")
+	log := logrus.WithField("module", "discord")
+	log.Info("cleaning up...")
 
+	log.Info("deleting commands...")
 	for _, v := range registeredCommands {
 		err := session.ApplicationCommandDelete(session.State.User.ID, "", v.ID)
 		if err != nil {
@@ -80,22 +82,12 @@ func Cleanup() error {
 		}
 	}
 
-	logrus.Info("shutting down discord...")
+	log.Info("shutting down...")
 	if err := session.Close(); err != nil {
 		return err
 	}
 
+	log.Info("cleaned up")
+
 	return nil
-}
-
-func followUpErrMessage(ctx *appctx.Context, s *discordgo.Session, i *discordgo.InteractionCreate, msg string) {
-	s.InteractionResponseDelete(i.Interaction)
-
-	if _, err := s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-		Content: msg,
-		Flags:   discordgo.MessageFlagsEphemeral,
-	}); err != nil {
-		ctx.Logger.WithError(err).Error("failed to follow up message")
-	}
-
 }

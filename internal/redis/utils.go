@@ -15,12 +15,12 @@ const (
 	guildPrefix  = "guild"
 )
 
-func preparePosts(ctx *appctx.Context, posts []*reddit.Post) ([]string, error) {
+func preparePosts(actx *appctx.Context, posts []*reddit.Post) ([]string, error) {
 	strings := make([]string, 0)
 	for _, p := range posts {
 		b, err := json.Marshal(p)
 		if err != nil {
-			ctx.Logger.WithField("func", "redis.preparePosts").WithError(err).Errorf("failed to marshal post: %v", p)
+			actx.Logger.WithField("func", "redis.preparePosts").WithError(err).Errorf("failed to marshal post: %v", p)
 			return nil, err
 		}
 		strings = append(strings, string(b))

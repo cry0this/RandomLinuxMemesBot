@@ -3,10 +3,12 @@ package appctx
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"github.com/sirupsen/logrus"
 )
 
-const Identifier = "uuid"
+const identifier = "req_id"
 
 type Context struct {
 	Context context.Context
@@ -15,17 +17,10 @@ type Context struct {
 
 func NewContext(ctx context.Context) *Context {
 	logger := logrus.StandardLogger()
-	fields := logrus.Fields{}
-
-	i := ctx.Value(Identifier)
-	if i != nil {
-		fields = logrus.Fields{
-			Identifier: i,
-		}
-	}
+	u := uuid.New()
 
 	return &Context{
 		Context: ctx,
-		Logger:  logger.WithFields(fields),
+		Logger:  logger.WithField(identifier, u.String()),
 	}
 }

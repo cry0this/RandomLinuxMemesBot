@@ -3,7 +3,6 @@ package memes
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -16,32 +15,33 @@ import (
 )
 
 const (
-	maxTries = 5
+	maxTries = 50
 )
 
-func GetNewMeme(ctx *appctx.Context, guildId string) (*reddit.Post, error) {
-	log := ctx.Logger.WithFields(logrus.Fields{
-		"func":  "memes.GetNewMeme",
-		"guild": guildId,
+func GetHotMeme(actx *appctx.Context, guild string) (*reddit.Post, error) {
+	log := actx.Logger.WithFields(logrus.Fields{
+		"func":  "memes.GetHotMeme",
+		"guild": guild,
 	})
 	log.Info("got new request")
 
-	cachedAll, err := redis.GetCachedPosts(ctx, "")
+	cachedAll, err := redis.GetCachedPosts(actx, "")
 	if err != nil {
 		return nil, err
 	}
 
 	if len(cachedAll) == 0 {
-		if err := fillCache(ctx); err != nil {
+		log.Info("cache is empty")
+		if err := fillCache(actx); err != nil {
 			return nil, err
 		}
-		cachedAll, err = redis.GetCachedPosts(ctx, "")
+		cachedAll, err = redis.GetCachedPosts(actx, "")
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	cachedGuild, err := redis.GetCachedPosts(ctx, guildId)
+	cachedGuild, err := redis.GetCachedPosts(actx, guild)
 	if err != nil {
 		return nil, err
 	}
@@ -53,75 +53,75 @@ func GetNewMeme(ctx *appctx.Context, guildId string) (*reddit.Post, error) {
 
 	for _, p := range randomized {
 		if !postInSlice(p, cachedGuild) {
-			log.WithFields(logrus.Fields{
-				"id":    p.ID,
-				"title": p.Title,
-				"url":   p.URL,
-			}).Info("adding post to guild cache")
-
-			if err := redis.AddToCache(ctx, p, guildId); err != nil {
+			log.WithField("post", p).Info("adding post to guild cache")
+			if err := redis.AddToCache(actx, p, guild); err != nil {
 				return nil, err
 			}
-
 			return p, nil
 		}
 	}
 
 	log.Info("trying to find new posts...")
 
-	// try to find newer posts
-	before := cachedAll[0].ID
-	postsBefore, err := reddit.GetPostsBefore(ctx, before)
-	if err != nil {
-		return nil, err
+	page := reddit.NewHotPage(actx)
+	page.Posts = append(page.Posts, cachedAll[0])
+
+	page, err = page.PrevPage()
+	if err == nil {
+		postsBefore, err := page.GetPosts()
+		if err == nil {
+			postsBefore = reddit.FilterPosts(actx, postsBefore)
+			if len(postsBefore) > 0 {
+				log.Info("adding newer posts to global cache")
+				if err := redis.PushToHead(actx, postsBefore, ""); err != nil {
+					return nil, err
+				}
+
+				p := postsBefore[0]
+
+				log.WithField("post", p).Info("adding post to guild cache")
+				if err := redis.AddToCache(actx, p, guild); err != nil {
+					return nil, err
+				}
+
+				return p, nil
+			}
+		}
 	}
 
-	if len(postsBefore) > 0 {
-		log.Info("adding newer posts to global cache")
+	page = reddit.NewHotPage(actx)
+	page.Posts = append(page.Posts, cachedAll[0])
 
-		if err := redis.PushToHead(ctx, postsBefore, ""); err != nil {
-			return nil, err
-		}
-
-		p := postsBefore[0]
-
-		log.WithFields(logrus.Fields{
-			"id":    p.ID,
-			"title": p.Title,
-			"url":   p.URL,
-		}).Info("adding post to guild cache")
-
-		if err := redis.AddToCache(ctx, p, guildId); err != nil {
-			return nil, err
-		}
-		return p, nil
-	}
-
-	postsAfter := make([]*reddit.Post, 0)
 	var newPost *reddit.Post
 
 	// try to find older posts
 	b := retry.NewConstant(time.Millisecond)
 	b = retry.WithMaxRetries(maxTries, b)
-	if retry.Do(ctx.Context, b, func(_ context.Context) error {
+	if err := retry.Do(actx.Context, b, func(_ context.Context) error {
 		log.Info("trying to find older post for guild...")
 
-		after := cachedAll[len(cachedAll)-1].ID
-		postsAfter, err = reddit.GetPostsAfter(ctx, after)
+		page, err = page.NextPage()
 		if err != nil {
 			return err
 		}
 
-		if len(postsAfter) == 0 {
-			return errors.New("unable to find older posts")
-		}
-
-		log.Info("adding older posts to cache")
-		if err := redis.PushToTail(ctx, postsAfter, ""); err != nil {
+		postsAfter, err := page.GetPosts()
+		if err != nil {
 			return err
 		}
 
-		cachedAll, err = redis.GetCachedPosts(ctx, "")
+		postsAfter = reddit.FilterPosts(actx, postsAfter)
+
+		if len(postsAfter) == 0 {
+			return retry.RetryableError(errors.New("unable to find older posts"))
+		}
+
+		log.Info("adding older posts to cache")
+		if err := redis.PushToTail(actx, postsAfter, ""); err != nil {
+			return err
+		}
+
+		cachedAll, err = redis.GetCachedPosts(actx, "")
 		if err != nil {
 			return err
 		}
@@ -133,51 +133,77 @@ func GetNewMeme(ctx *appctx.Context, guildId string) (*reddit.Post, error) {
 			}
 		}
 
-		return retry.RetryableError(errors.New("unable to find older post for guild"))
+		return retry.RetryableError(errors.New("unable to find older post"))
 	}); err != nil {
 		return nil, err
 	}
 
-	log.WithFields(logrus.Fields{
-		"id":    newPost.ID,
-		"title": newPost.Title,
-		"url":   newPost.URL,
-	}).Info("adding post to guild cache")
+	log.WithField("post", newPost).Info("adding post to guild cache")
 
-	if err := redis.AddToCache(ctx, newPost, guildId); err != nil {
+	if err := redis.AddToCache(actx, newPost, guild); err != nil {
 		return nil, err
 	}
 
 	return newPost, nil
 }
 
-func fillCache(ctx *appctx.Context) error {
-	ctx.Logger.WithField("func", "memes.fillCache").Info("refilling cache...")
+func GetTopMeme(actx *appctx.Context, guild string, period string) (*reddit.Post, error) {
+	log := actx.Logger.WithFields(logrus.Fields{
+		"func":   "memes.GetTopMeme",
+		"guild":  guild,
+		"period": period,
+	})
 
-	p, err := redis.GetCachedPosts(ctx, "")
+	log.Info("got new request")
+
+	cache, err := redis.GetCachedPosts(actx, guild)
 	if err != nil {
-		return fmt.Errorf("failed to read cache: %v", err)
+		return nil, err
 	}
 
-	if len(p) == 0 {
-		p, err = reddit.GetPosts(ctx)
+	var post *reddit.Post
+	page := reddit.NewTopPage(actx, period)
+
+	b := retry.NewConstant(time.Millisecond)
+	b = retry.WithMaxRetries(maxTries, b)
+	if err := retry.Do(actx.Context, b, func(_ context.Context) error {
+		log.Info("trying to find new post")
+
+		posts, err := page.GetPosts()
 		if err != nil {
-			return fmt.Errorf("failed to get reddit posts: %v", err)
+			return err
 		}
 
-		if err := redis.PushToHead(ctx, p, ""); err != nil {
-			return fmt.Errorf("failed to fill cache: %v", err)
+		posts = reddit.FilterPosts(actx, posts)
+		if len(posts) == 0 {
+			page, err = page.NextPage()
+			if err != nil {
+				return err
+			}
+			return retry.RetryableError(errors.New("unable to find new post"))
 		}
+
+		rand.Shuffle(len(posts), func(i, j int) { posts[i], posts[j] = posts[j], posts[i] })
+
+		for _, p := range posts {
+			if !postInSlice(p, cache) {
+				post = p
+				return nil
+			}
+		}
+
+		page, err = page.NextPage()
+		if err != nil {
+			return err
+		}
+
+		return retry.RetryableError(errors.New("unable to find new post"))
+	}); err != nil {
+		return nil, err
 	}
 
-	return nil
-}
+	log.WithField("post", post).Info("adding post to guild cache")
+	redis.AddToCache(actx, post, guild)
 
-func postInSlice(p *reddit.Post, posts []*reddit.Post) bool {
-	for _, i := range posts {
-		if *p == *i {
-			return true
-		}
-	}
-	return false
+	return post, nil
 }

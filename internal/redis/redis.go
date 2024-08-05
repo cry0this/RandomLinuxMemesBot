@@ -17,7 +17,8 @@ import (
 var client *redis.Client
 
 func Init(ctx context.Context) error {
-	logrus.Info("initializing redis...")
+	log := logrus.WithField("module", "redis")
+	log.Info("initializing...")
 
 	url := os.Getenv("REDIS_URL")
 	opts, err := redis.ParseURL(url)
@@ -25,8 +26,7 @@ func Init(ctx context.Context) error {
 		return fmt.Errorf("failed to parse REDIS_URL variable: %v", err)
 	}
 
-	log := logrus.WithField("url", url)
-	log.Info("connecting to redis...")
+	log.WithField("url", url).Info("connecting...")
 
 	client = redis.NewClient(opts)
 
@@ -34,68 +34,68 @@ func Init(ctx context.Context) error {
 		return errors.New("failed to connect redis, check REDIS_URL variable")
 	}
 
-	log.Info("redis initialized")
+	log.Info("initialized")
 	return nil
 }
 
-func AddToCache(ctx *appctx.Context, post *reddit.Post, key string) error {
-	ctx.Logger.WithFields(logrus.Fields{
+func AddToCache(actx *appctx.Context, post *reddit.Post, key string) error {
+	actx.Logger.WithFields(logrus.Fields{
 		"func": "redis.AddToCache",
 		"post": post,
-		"key":  key,
 	}).Info("adding to cache...")
 
 	posts := []*reddit.Post{post}
-	return PushToTail(ctx, posts, key)
+	return PushToTail(actx, posts, key)
 }
 
-func PushToHead(ctx *appctx.Context, posts []*reddit.Post, key string) error {
-	p, err := preparePosts(ctx, posts)
+func PushToHead(actx *appctx.Context, posts []*reddit.Post, key string) error {
+	p, err := preparePosts(actx, posts)
 	if err != nil {
 		return err
 	}
 
 	k := normalizeKey(key)
-	if err := client.LPush(ctx.Context, k, p).Err(); err != nil {
+	if err := client.LPush(actx.Context, k, p).Err(); err != nil {
 		return err
 	}
 
-	ctx.Logger.WithFields(logrus.Fields{
+	actx.Logger.WithFields(logrus.Fields{
 		"func": "redis.PushToHead",
-		"key":  key,
+		"key":  k,
 	}).Infof("pushed: %d", len(posts))
 
 	return nil
 }
 
-func PushToTail(ctx *appctx.Context, posts []*reddit.Post, key string) error {
-	p, err := preparePosts(ctx, posts)
+func PushToTail(actx *appctx.Context, posts []*reddit.Post, key string) error {
+	p, err := preparePosts(actx, posts)
 	if err != nil {
 		return err
 	}
 
 	k := normalizeKey(key)
-	if err := client.RPush(ctx.Context, k, p).Err(); err != nil {
+	if err := client.RPush(actx.Context, k, p).Err(); err != nil {
 		return err
 	}
 
-	ctx.Logger.WithFields(logrus.Fields{
+	actx.Logger.WithFields(logrus.Fields{
 		"func": "redis.PushToTail",
-		"key":  key,
+		"key":  k,
 	}).Infof("pushed: %d", len(posts))
 
 	return nil
 }
 
-func GetCachedPosts(ctx *appctx.Context, key string) ([]*reddit.Post, error) {
-	ctx.Logger.WithFields(logrus.Fields{
-		"func": "redis.GetCachedPosts",
-		"key":  key,
-	}).Info("getting cached posts...")
-
+func GetCachedPosts(actx *appctx.Context, key string) ([]*reddit.Post, error) {
 	k := normalizeKey(key)
 
-	strings, err := client.LRange(ctx.Context, k, 0, -1).Result()
+	log := actx.Logger.WithFields(logrus.Fields{
+		"func": "redis.GetCachedPosts",
+		"key":  k,
+	})
+	log.Info("getting cached posts...")
+
+	strings, err := client.LRange(actx.Context, k, 0, -1).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +108,8 @@ func GetCachedPosts(ctx *appctx.Context, key string) ([]*reddit.Post, error) {
 		}
 		posts = append(posts, &p)
 	}
+
+	log.Infof("got posts: %d", len(posts))
 
 	return posts, nil
 }

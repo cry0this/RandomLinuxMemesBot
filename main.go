@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/sirupsen/logrus"
 
@@ -15,7 +16,7 @@ import (
 var ctx context.Context = context.Background()
 
 func init() {
-	logrus.Info("initializing...")
+	logrus.Info("initializing app...")
 
 	if err := redis.Init(ctx); err != nil {
 		logrus.WithError(err).Fatal("failed to init redis")
@@ -25,7 +26,7 @@ func init() {
 		logrus.WithError(err).Fatal("failed to init reddit")
 	}
 
-	if err := discord.Init(&ctx); err != nil {
+	if err := discord.Init(ctx); err != nil {
 		logrus.WithError(err).Fatal("failed to init discord")
 	}
 
@@ -33,9 +34,14 @@ func init() {
 }
 
 func main() {
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
-	<-stop
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+	<-sig
 
 	logrus.Info("closing app...")
 
